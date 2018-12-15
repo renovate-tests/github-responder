@@ -2,6 +2,8 @@ package responder
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 	"net/url"
 
 	"net/http"
@@ -14,7 +16,7 @@ import (
 )
 
 // Start -
-func Start(ctx context.Context, opts Config, action func(eventType, deliveryID string, payload []byte)) (func(), error) {
+func Start(ctx context.Context, opts Config, action HookAction) (func(), error) {
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: opts.GitHubToken},
 	)
@@ -39,6 +41,9 @@ func Start(ctx context.Context, opts Config, action func(eventType, deliveryID s
 
 	// Register the webhook with GitHub
 	log.Print("Registering WebHook...")
+	if opts.HookSecret == "" {
+		opts.HookSecret = fmt.Sprintf("%x", rand.Int63())
+	}
 	id, err := registerHook(ctx, client, opts)
 	if err != nil {
 		return nil, err
@@ -111,10 +116,9 @@ func registerHook(ctx context.Context, client *github.Client, opts Config) (int6
 	return id, nil
 }
 
-func handleCallback(secret string, action func(eventType, deliveryID string, payload []byte)) func(resp http.ResponseWriter, req *http.Request) {
+func handleCallback(secret string, action HookAction) func(resp http.ResponseWriter, req *http.Request) {
 	secretKey := []byte(secret)
 	return func(resp http.ResponseWriter, req *http.Request) {
-		log.Printf("Incoming request at %s", req.URL)
 		payload, err := github.ValidatePayload(req, secretKey)
 		if err != nil {
 			log.Error().Err(err).
@@ -125,7 +129,15 @@ func handleCallback(secret string, action func(eventType, deliveryID string, pay
 
 		eventType := github.WebHookType(req)
 		deliveryID := github.DeliveryID(req)
-		go action(eventType, deliveryID, payload)
+		logger := log.With().
+			Str("eventType", eventType).
+			Str("deliveryID", deliveryID).
+			Logger()
+		logger.Debug().Msgf("Incoming request at %s", req.URL)
+
+		// Add the logger to the context
+		ctx := logger.WithContext(req.Context())
+		go action(ctx, eventType, deliveryID, payload)
 
 		resp.WriteHeader(204)
 	}
@@ -134,3 +146,6 @@ func handleCallback(secret string, action func(eventType, deliveryID string, pay
 func denyHandler(resp http.ResponseWriter, req *http.Request) {
 	resp.WriteHeader(http.StatusNotFound)
 }
+
+// HookAction -
+type HookAction func(ctx context.Context, eventType, deliveryID string, payload []byte)

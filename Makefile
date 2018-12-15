@@ -1,7 +1,7 @@
 .DEFAULT_GOAL = build
 extension = $(patsubst windows,.exe,$(filter windows,$(1)))
 GO := go
-PKG_NAME := github-responder
+PKG_NAME ?= github-responder
 PREFIX := .
 GO111MODULE := on
 GOFLAGS := -mod=vendor

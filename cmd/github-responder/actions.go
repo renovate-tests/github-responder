@@ -2,18 +2,19 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/hairyhenderson/github-responder"
 	"os"
 	"os/exec"
 
-	"github.com/rs/zerolog/log"
+	zlog "github.com/rs/zerolog/log"
 )
 
-func defaultAction(eventType, deliveryID string, payload []byte) {
+func defaultAction(ctx context.Context, eventType, deliveryID string, payload []byte) {
+	log := zlog.Ctx(ctx)
 	log.Info().
-		Str("eventType", eventType).
-		Str("deliveryID", deliveryID).
 		Int("size", len(payload)).
 		Msg("Received event")
 
@@ -30,14 +31,13 @@ func defaultAction(eventType, deliveryID string, payload []byte) {
 	fmt.Println(string(pretty))
 }
 
-func execArgs(args ...string) func(eventType, deliveryID string, payload []byte) {
-	return func(eventType, deliveryID string, payload []byte) {
+func execArgs(args ...string) responder.HookAction {
+	return func(ctx context.Context, eventType, deliveryID string, payload []byte) {
+		log := zlog.Ctx(ctx)
 		name := args[0]
 		cmdArgs := args[1:]
 		cmdArgs = append(cmdArgs, eventType, deliveryID)
 		log.Debug().
-			Str("eventType", eventType).
-			Str("deliveryID", deliveryID).
 			Int("size", len(payload)).
 			Str("command", name).
 			Strs("args", cmdArgs).
