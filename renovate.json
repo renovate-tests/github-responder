@@ -27,8 +27,6 @@
   ],
   "rangeStrategy": "auto",
   "rebaseStalePrs": true,
-  "prConcurrentLimit": 20,
-  "prHourlyLimit": 4,
   "labels": [
     "dependencies"
   ]
